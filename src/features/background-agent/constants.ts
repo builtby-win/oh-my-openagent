@@ -54,6 +54,7 @@ export interface SubagentSessionCreatedEvent {
   sessionID: string
   parentID: string
   title: string
+  agent?: string
 }
 
 export type OnSubagentSessionCreated = (event: SubagentSessionCreatedEvent) => Promise<void>

@@ -432,6 +432,9 @@
               },
               "additionalProperties": false
             },
+            "external_cmd": {
+              "type": "string"
+            },
             "compaction": {
               "type": "object",
               "properties": {
@@ -784,6 +787,9 @@
                 }
               },
               "additionalProperties": false
+            },
+            "external_cmd": {
+              "type": "string"
             },
             "compaction": {
               "type": "object",
@@ -1138,6 +1144,9 @@
               },
               "additionalProperties": false
             },
+            "external_cmd": {
+              "type": "string"
+            },
             "compaction": {
               "type": "object",
               "properties": {
@@ -1490,6 +1499,9 @@
                 }
               },
               "additionalProperties": false
+            },
+            "external_cmd": {
+              "type": "string"
             },
             "compaction": {
               "type": "object",
@@ -1847,6 +1859,9 @@
               },
               "additionalProperties": false
             },
+            "external_cmd": {
+              "type": "string"
+            },
             "compaction": {
               "type": "object",
               "properties": {
@@ -2199,6 +2214,9 @@
                 }
               },
               "additionalProperties": false
+            },
+            "external_cmd": {
+              "type": "string"
             },
             "compaction": {
               "type": "object",
@@ -2553,6 +2571,9 @@
               },
               "additionalProperties": false
             },
+            "external_cmd": {
+              "type": "string"
+            },
             "compaction": {
               "type": "object",
               "properties": {
@@ -2905,6 +2926,9 @@
                 }
               },
               "additionalProperties": false
+            },
+            "external_cmd": {
+              "type": "string"
             },
             "compaction": {
               "type": "object",
@@ -3259,6 +3283,9 @@
               },
               "additionalProperties": false
             },
+            "external_cmd": {
+              "type": "string"
+            },
             "compaction": {
               "type": "object",
               "properties": {
@@ -3611,6 +3638,9 @@
                 }
               },
               "additionalProperties": false
+            },
+            "external_cmd": {
+              "type": "string"
             },
             "compaction": {
               "type": "object",
@@ -3965,6 +3995,9 @@
               },
               "additionalProperties": false
             },
+            "external_cmd": {
+              "type": "string"
+            },
             "compaction": {
               "type": "object",
               "properties": {
@@ -4317,6 +4350,9 @@
                 }
               },
               "additionalProperties": false
+            },
+            "external_cmd": {
+              "type": "string"
             },
             "compaction": {
               "type": "object",
@@ -4671,6 +4707,9 @@
               },
               "additionalProperties": false
             },
+            "external_cmd": {
+              "type": "string"
+            },
             "compaction": {
               "type": "object",
               "properties": {
@@ -5023,6 +5062,9 @@
                 }
               },
               "additionalProperties": false
+            },
+            "external_cmd": {
+              "type": "string"
             },
             "compaction": {
               "type": "object",

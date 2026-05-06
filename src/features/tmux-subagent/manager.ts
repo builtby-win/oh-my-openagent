@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { TmuxConfig } from "../../config/schema"
+import type { OhMyOpenCodeConfig, TmuxConfig } from "../../config/schema"
 import type { TrackedSession, CapacityConfig, WindowState } from "./types"
 import { log } from "../../shared"
 import {
@@ -30,12 +30,13 @@ type SpawnStage =
 
 interface SessionCreatedEvent {
   type: string
-  properties?: { info?: { id?: string; parentID?: string; title?: string } }
+  properties?: { info?: { id?: string; parentID?: string; title?: string; agentName?: string } }
 }
 
 interface DeferredSession {
   sessionId: string
   title: string
+  agentName?: string
   queuedAt: Date
   retryIsolatedContainer: boolean
 }
@@ -43,6 +44,7 @@ interface DeferredSession {
 interface FailedReadinessSessionSeed {
   sessionId: string
   title: string
+  agentName?: string
 }
 
 interface FailedReadinessSession extends FailedReadinessSessionSeed {
@@ -92,9 +94,11 @@ export class TmuxSessionManager {
   private isolatedContainerNullStateCount = 0
   private staleSweepCompleted = false
   private staleSweepInProgress = false
-  constructor(ctx: PluginInput, tmuxConfig: TmuxConfig, deps: TmuxUtilDeps = defaultTmuxDeps) {
+  private pluginConfig: OhMyOpenCodeConfig | undefined
+  constructor(ctx: PluginInput, tmuxConfig: TmuxConfig, pluginConfig?: OhMyOpenCodeConfig, deps: TmuxUtilDeps = defaultTmuxDeps) {
     this.client = ctx.client
     this.tmuxConfig = tmuxConfig
+    this.pluginConfig = pluginConfig
     this.projectDirectory = ctx.directory || process.cwd()
     this.deps = deps
     const configuredPort = process.env.OPENCODE_PORT
@@ -480,6 +484,7 @@ export class TmuxSessionManager {
     sessionId: string,
     title: string,
     retryIsolatedContainer = false,
+    agentName?: string,
   ): void {
     if (this.shouldSkipRespawnAfterPollingClose(sessionId, "deferred enqueue")) {
       this.clearFailedReadinessSession(sessionId)
@@ -507,6 +512,7 @@ export class TmuxSessionManager {
     this.deferredSessions.set(sessionId, {
       sessionId,
       title,
+      agentName,
       queuedAt: new Date(),
       retryIsolatedContainer,
     })
@@ -712,7 +718,7 @@ export class TmuxSessionManager {
     rememberReadinessFailure: boolean
   }): Promise<void> {
     const { session, stage, rememberReadinessFailure } = args
-    const { sessionId, title } = session
+    const { sessionId, title, agentName } = session
 
     const readyForSpawn = await this.ensureSessionReadyBeforeSpawn(sessionId, stage)
     if (!readyForSpawn) {
@@ -753,7 +759,7 @@ export class TmuxSessionManager {
 
     if (this.isIsolated() && !this.isolatedWindowPaneId) {
       log("[tmux-session-manager] isolated container failed, deferring session for retry", { sessionId })
-      this.enqueueDeferredSession(sessionId, title, true)
+      this.enqueueDeferredSession(sessionId, title, true, agentName)
       return
     }
     const sourcePaneId = this.getEffectiveSourcePaneId()
@@ -765,7 +771,7 @@ export class TmuxSessionManager {
     const state = await this.deps.queryWindowState(sourcePaneId)
     if (!state) {
       log("[tmux-session-manager] failed to query window state, deferring session")
-      this.enqueueDeferredSession(sessionId, title)
+      this.enqueueDeferredSession(sessionId, title, false, agentName)
       return
     }
 
@@ -803,18 +809,26 @@ export class TmuxSessionManager {
 
     if (!decision.canSpawn) {
       log("[tmux-session-manager] cannot spawn", { reason: decision.reason })
-      this.enqueueDeferredSession(sessionId, title)
+      this.enqueueDeferredSession(sessionId, title, false, agentName)
       return
     }
 
+    const actionsWithAgent = decision.actions.map((action) => {
+      if (action.type === "spawn" || action.type === "replace") {
+        return { ...action, agentName }
+      }
+      return action
+    })
+
     const result = await executeActions(
-      decision.actions,
+      actionsWithAgent,
       {
         config: this.tmuxConfig,
         directory: this.projectDirectory,
         serverUrl: this.serverUrl,
         windowState: state,
         sourcePaneId,
+        pluginConfig: this.pluginConfig,
       },
     )
 
@@ -864,7 +878,7 @@ export class TmuxSessionManager {
     log("[tmux-session-manager] re-queueing deferred session after spawn failure", {
       sessionId,
     })
-    this.enqueueDeferredSession(sessionId, title)
+    this.enqueueDeferredSession(sessionId, title, false, agentName)
 
     if (result.spawnedPaneId) {
       await executeAction(
@@ -1040,12 +1054,20 @@ export class TmuxSessionManager {
         return
       }
 
-      const result = await executeActions(decision.actions, {
+      const actionsWithAgent = decision.actions.map((action) => {
+        if (action.type === "spawn" || action.type === "replace") {
+          return { ...action, agentName: deferred.agentName }
+        }
+        return action
+      })
+
+      const result = await executeActions(actionsWithAgent, {
         config: this.tmuxConfig,
         directory: this.projectDirectory,
         serverUrl: this.serverUrl,
         windowState: state,
         sourcePaneId: effectiveSourcePaneId,
+        pluginConfig: this.pluginConfig,
       })
 
       if (!result.success || !result.spawnedPaneId) {
@@ -1098,6 +1120,7 @@ export class TmuxSessionManager {
 
     const sessionId = info.id
     const title = info.title ?? "Subagent"
+    const agentName = info.agentName
 
     if (!this.sourcePaneId) {
       log("[tmux-session-manager] no source pane id")
@@ -1112,7 +1135,7 @@ export class TmuxSessionManager {
       await this.sweepStaleIsolatedSessionsOnce()
       await this.retryPendingCloses()
 
-      const session = { sessionId, title }
+      const session = { sessionId, title, agentName }
 
       await this.enqueueSpawn(async () => {
         try {

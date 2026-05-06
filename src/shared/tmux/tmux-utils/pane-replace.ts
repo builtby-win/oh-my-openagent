@@ -1,16 +1,18 @@
-import type { TmuxConfig } from "../../../config/schema"
+import type { OhMyOpenCodeConfig, TmuxConfig } from "../../../config/schema"
 import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 import type { SpawnPaneResult } from "../types"
 import { isInsideTmux } from "./environment"
 import { shellSingleQuote } from "../../shell-env"
 
 export async function replaceTmuxPane(
-	paneId: string,
-	sessionId: string,
-	description: string,
-	config: TmuxConfig,
-	serverUrl: string,
-	directory: string,
+  paneId: string,
+  sessionId: string,
+  description: string,
+  config: TmuxConfig,
+  serverUrl: string,
+  directory: string,
+  agentName?: string,
+  pluginConfig?: OhMyOpenCodeConfig,
 ): Promise<SpawnPaneResult> {
 	const [{ log }, { runTmuxCommand }] = await Promise.all([
 		import("../../logger"),
@@ -34,17 +36,23 @@ export async function replaceTmuxPane(
 	log("[replaceTmuxPane] sending Ctrl+C for graceful shutdown", { paneId })
 	await runTmuxCommand(tmux, ["send-keys", "-t", paneId, "C-c"])
 
-	const effectiveDirectory = directory || process.cwd()
-	const opencodeCmd = `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(sessionId)} --dir ${shellSingleQuote(effectiveDirectory)}`
+  const effectiveDirectory = directory || process.cwd()
 
-	const result = await runTmuxCommand(tmux, ["respawn-pane", "-k", "-t", paneId, opencodeCmd])
+  const agentCfg = agentName ? (pluginConfig?.agents as Record<string, { external_cmd?: string }> | undefined)?.[agentName] : undefined
+  const cmd = agentCfg?.external_cmd
+    ? agentCfg.external_cmd
+    : `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(sessionId)} --dir ${shellSingleQuote(effectiveDirectory)}`
+
+  const result = await runTmuxCommand(tmux, ["respawn-pane", "-k", "-t", paneId, cmd])
 
 	if (result.exitCode !== 0) {
 		log("[replaceTmuxPane] FAILED", { paneId, exitCode: result.exitCode, stderr: result.stderr.trim() })
 		return { success: false }
 	}
 
-	const title = `omo-subagent-${description.slice(0, 20)}`
+  const title = agentCfg?.external_cmd
+    ? `external-${agentName ?? "cli"}-${description.slice(0, 20)}`
+    : `omo-subagent-${description.slice(0, 20)}`
 	const titleResult = await runTmuxCommand(tmux, ["select-pane", "-t", paneId, "-T", title])
 	if (titleResult.exitCode !== 0) {
 		log("[replaceTmuxPane] WARNING: failed to set pane title", {

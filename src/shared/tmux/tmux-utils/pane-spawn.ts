@@ -1,4 +1,4 @@
-import type { TmuxConfig } from "../../../config/schema"
+import type { OhMyOpenCodeConfig, TmuxConfig } from "../../../config/schema"
 import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 import type { SpawnPaneResult } from "../types"
 import type { SplitDirection } from "./environment"
@@ -7,13 +7,15 @@ import { isServerRunning } from "./server-health"
 import { shellSingleQuote } from "../../shell-env"
 
 export async function spawnTmuxPane(
-	sessionId: string,
-	description: string,
-	config: TmuxConfig,
-	serverUrl: string,
-	directory: string,
-	targetPaneId?: string,
-	splitDirection: SplitDirection = "-h",
+  sessionId: string,
+  description: string,
+  config: TmuxConfig,
+  serverUrl: string,
+  directory: string,
+  targetPaneId?: string,
+  splitDirection: SplitDirection = "-h",
+  agentName?: string,
+  pluginConfig?: OhMyOpenCodeConfig,
 ): Promise<SpawnPaneResult> {
 	const [{ log }, { runTmuxCommand }] = await Promise.all([
 		import("../../logger"),
@@ -52,19 +54,23 @@ export async function spawnTmuxPane(
 
 	log("[spawnTmuxPane] all checks passed, spawning...")
 
-	const effectiveDirectory = directory || process.cwd()
-	const opencodeCmd = `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(sessionId)} --dir ${shellSingleQuote(effectiveDirectory)}`
+  const effectiveDirectory = directory || process.cwd()
 
-	const args = [
-		"split-window",
-		splitDirection,
-		"-d",
-		"-P",
-		"-F",
-		"#{pane_id}",
-		...(targetPaneId ? ["-t", targetPaneId] : []),
-		opencodeCmd,
-	]
+  const agentCfg = agentName ? (pluginConfig?.agents as Record<string, { external_cmd?: string }> | undefined)?.[agentName] : undefined
+  const cmd = agentCfg?.external_cmd
+    ? agentCfg.external_cmd
+    : `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(sessionId)} --dir ${shellSingleQuote(effectiveDirectory)}`
+
+  const args = [
+    "split-window",
+    splitDirection,
+    "-d",
+    "-P",
+    "-F",
+    "#{pane_id}",
+    ...(targetPaneId ? ["-t", targetPaneId] : []),
+    cmd,
+  ]
 
 	const result = await runTmuxCommand(tmux, args)
 	const paneId = result.output
@@ -73,7 +79,9 @@ export async function spawnTmuxPane(
 		return { success: false }
 	}
 
-	const title = `omo-subagent-${description.slice(0, 20)}`
+  const title = agentCfg?.external_cmd
+    ? `external-${agentName ?? "cli"}-${description.slice(0, 20)}`
+    : `omo-subagent-${description.slice(0, 20)}`
 	const titleResult = await runTmuxCommand(tmux, ["select-pane", "-t", paneId, "-T", title])
 	if (titleResult.exitCode !== 0) {
 		log("[spawnTmuxPane] WARNING: failed to set pane title", {

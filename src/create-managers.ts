@@ -57,7 +57,7 @@ export function createManagers(args: {
   if (tmuxConfig.enabled) {
     deps.markServerRunningInProcessFn()
   }
-  const tmuxSessionManager = new deps.TmuxSessionManagerClass(ctx, tmuxConfig)
+  const tmuxSessionManager = new deps.TmuxSessionManagerClass(ctx, tmuxConfig, pluginConfig)
   const modelFallbackControllerAccessor = createModelFallbackControllerAccessor()
 
   deps.registerManagerForCleanupFn({

@@ -1,4 +1,4 @@
-import type { TmuxConfig } from "../../config/schema"
+import type { OhMyOpenCodeConfig, TmuxConfig } from "../../config/schema"
 import type { PaneAction, WindowState } from "./types"
 import {
   applyLayout,
@@ -26,6 +26,7 @@ export interface ExecuteContext {
   serverUrl: string
   windowState: WindowState
   sourcePaneId?: string
+  pluginConfig?: OhMyOpenCodeConfig
 }
 
 async function enforceMainPane(
@@ -77,11 +78,13 @@ export async function executeAction(
     const result = await replaceTmuxPane(
       action.paneId,
       action.newSessionId,
-		action.description,
-		ctx.config,
-		ctx.serverUrl,
-		ctx.directory,
-	)
+      action.description,
+      ctx.config,
+      ctx.serverUrl,
+      ctx.directory,
+      action.agentName,
+      ctx.pluginConfig,
+    )
     if (result.success) {
       await enforceLayoutAndMainPane(ctx)
     }
@@ -93,13 +96,15 @@ export async function executeAction(
 
   const result = await spawnTmuxPane(
     action.sessionId,
-		action.description,
-		ctx.config,
-		ctx.serverUrl,
-		ctx.directory,
-		action.targetPaneId,
-		action.splitDirection
-	)
+    action.description,
+    ctx.config,
+    ctx.serverUrl,
+    ctx.directory,
+    action.targetPaneId,
+    action.splitDirection,
+    action.agentName,
+    ctx.pluginConfig,
+  )
 
   if (result.success) {
     await enforceLayoutAndMainPane(ctx)

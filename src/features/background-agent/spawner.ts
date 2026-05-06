@@ -209,6 +209,7 @@ export async function startTask(
       sessionID,
       parentID: input.parentSessionId,
       title: input.description,
+      agent: input.agent,
     }).catch((err) => {
       log("[background-agent] Failed to spawn tmux pane:", err)
     })

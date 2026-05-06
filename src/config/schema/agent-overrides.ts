@@ -47,6 +47,9 @@ export const AgentOverrideConfigSchema = z.object({
       variant: z.string().optional(),
     })
     .optional(),
+  /** External CLI command to run in tmux pane instead of `opencode attach`.
+   *  e.g. "claude --dangerously-skip-permissions" or "gemini --yolo -i" */
+  external_cmd: z.string().optional(),
   compaction: z
     .object({
       model: z.string().optional(),
